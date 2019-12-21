@@ -11,7 +11,16 @@ import string
 import random
 import argparse
 import tensorflow as tf
+from presets import Preset
+import librosa as _librosa
+import matplotlib.pyplot as plt
 import tensorflow.keras as keras
+import librosa.display as _display
+
+#Setting Librosa presets for audio captchas
+_librosa.display = _display
+librosa = Preset(_librosa)
+librosa['sr'] = 44100
 
 def decode(characters, y):
     y = numpy.argmax(numpy.array(y), axis=2)[:,0]
@@ -19,6 +28,7 @@ def decode(characters, y):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--captcha-type', help='Specify the type of captcha, audio | image', default='image', type=str)
     parser.add_argument('--model-name', help='Model name to use for classification', type=str)
     parser.add_argument('--captcha-dir', help='Where to read the captchas to break', type=str)
     parser.add_argument('--output', help='File where the classifications should be saved', type=str)
@@ -60,13 +70,25 @@ def main():
                           metrics=['accuracy'])
 
             for x in os.listdir(args.captcha_dir):
+                raw_data = None
+                captcha_file = os.path.join(args.captcha_dir, x)
+                
+                if args.captcha_type.lower() == 'image':
                 # load image and preprocess it
-                raw_data = cv2.imread(os.path.join(args.captcha_dir, x))
-                gray_data = cv2.cvtColor(raw_data, cv2.COLOR_BGR2GRAY)
-                thresh_data = cv2.threshold(gray_data,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-                kernel = numpy.ones((2, 2), numpy.uint8)
-                denoised_data = cv2.dilate(thresh_data, kernel, iterations = 1)
-                normalized_data = numpy.array(denoised_data) / 255.0
+                    raw_data = cv2.adaptiveThreshold(cv2.imread(captcha_file,0),255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,11,2)
+
+                elif args.captcha_type.lower() == 'audio':
+                    y,sr = librosa.core.load(captcha_file)
+                    M = librosa.feature.melspectrogram(y=y)
+                    fig = plt.figure(figsize=(1.28, .64),dpi = 1024)
+                    plt.axes([0., 0., 1., 1., ], frameon=False, xticks=[], yticks=[])
+                    plot = librosa.display.specshow(librosa.power_to_db(M, ref=np.max),cmap='gray_r')
+                    fig.canvas.draw()
+                    audio_buffer = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(fig.canvas.get_width_height()[::-1] + (3,))
+                    plt.close(fig)
+                    raw_data = cv2.resize(cv2.cvtColor(audio_buffer, cv2.COLOR_BGR2GRAY), (128, 64))
+
+                normalized_data = numpy.array(raw_data) / 255.0
     
                 (h, w) = normalized_data.shape
                 image = normalized_data.reshape([-1, h, w, 1])
