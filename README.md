@@ -1,5 +1,6 @@
 # captcha-cruncher
 CNN to solve image and audio captch using Keras.
+Build extending the [captcha breaker demo](https://gitlab.com/andrewwja/captcha-demo/tree/master) by [Prof. Andrew Anderson](scss.tcd.ie/~andersan) 
 
 Required dependencies: python-captcha, opencv, python-tensorflow (CPU or GPU)
 
